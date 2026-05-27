@@ -22,6 +22,13 @@ Write-Logo
 $confirm = Read-Host "Êtes-vous certain de vouloir supprimer CyCode et toutes ses données ? (o/n)"
 if ($confirm -ne "o") { Write-Host "Désinstallation annulée." -ForegroundColor $Colors.Accent; exit }
 
+Write-Host "`nSuppression en cours..." -ForegroundColor $Colors.Accent
+
+# 1. Désinstallation via PIP
+Write-Progress -Activity "Nettoyage CyCode" -Status "Désinstallation du package Python (pip)" -PercentComplete 20
+pip uninstall cycode -y | Out-Null
+
+# 2. Suppression des dossiers et fichiers
 $items = @(
     @{ path = $baseDir; desc = "Répertoire principal CyCode" },
     @{ path = "$HOME\.cygnis.json"; desc = "Config Cygnis 1" },
@@ -29,20 +36,17 @@ $items = @(
     @{ path = "$HOME\.cycode_history"; desc = "Historique REPL" }
 )
 
-Write-Host "`nSuppression en cours..." -ForegroundColor $Colors.Accent
-
-# Suppression des dossiers et fichiers
 for ($i = 0; $i -lt $items.Count; $i++) {
     $item = $items[$i]
-    Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de : $($item.desc)" -PercentComplete (($i / $items.Count) * 100)
+    Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de : $($item.desc)" -PercentComplete (40 + ($i / $items.Count) * 30)
     
     if (Test-Path $item.path) {
         Remove-Item $item.path -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
-# Suppression de l'exécutable système (cycode.exe)
-Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de l'exécutable système" -PercentComplete 90
+# 3. Suppression de l'exécutable système (cycode.exe)
+Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de l'exécutable système" -PercentComplete 80
 $pyPath = Get-Command python.exe -ErrorAction SilentlyContinue
 if ($pyPath) {
     $scriptsDir = Join-Path (Split-Path $pyPath.Definition) "Scripts"
@@ -52,7 +56,7 @@ if ($pyPath) {
     }
 }
 
-# Suppression de l'alias dans le profil utilisateur
+# 4. Suppression de l'alias dans le profil utilisateur
 if (Test-Path $PROFILE) {
     $content = Get-Content $PROFILE
     $newContent = $content | Where-Object { $_ -notmatch "cycode" }
