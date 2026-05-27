@@ -58,7 +58,7 @@ foreach ($tool in @("git", "python")) {
     }
 }
 
-# Vérifie que Python >= 3.8
+# Vérifie que Python >= 3.9
 $pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Impossible de déterminer la version de Python."
@@ -67,8 +67,8 @@ if ($LASTEXITCODE -ne 0) {
 $pyParts = $pyVersion.Trim().Split('.')
 $pyMajor = [int]$pyParts[0]
 $pyMinor = [int]$pyParts[1]
-if ($pyMajor -lt 3 -or ($pyMajor -eq 3 -and $pyMinor -lt 8)) {
-    Write-Error "Python 3.8+ requis (trouvé : $pyVersion)."
+if ($pyMajor -lt 3 -or ($pyMajor -eq 3 -and $pyMinor -lt 9)) {
+    Write-Error "Python 3.9+ requis (trouvé : $pyVersion)."
     exit 1
 }
 Write-Host "  Python $pyVersion détecté." -ForegroundColor DarkGray
@@ -118,25 +118,31 @@ $python = "$VENV_DIR\Scripts\python.exe"
 & $python -m pip install --upgrade pip --quiet
 if ($LASTEXITCODE -ne 0) { Write-Error "Échec de la mise à jour de pip."; exit 1 }
 
-& $pip install -e $REPO_DIR --quiet
+# Installation depuis repo/ — pip install -e . enregistre src.cycode_repl:launch_repl
+Push-Location $REPO_DIR
+& $pip install -e . --quiet
 if ($LASTEXITCODE -ne 0) { Write-Error "Échec de l'installation du paquet."; exit 1 }
+Pop-Location
 
 # ── 5. Création des launchers ─────────────────────────────────────────────────
 Write-Step "Création des launchers..."
 
-# Launcher .bat (compatible cmd et PowerShell via PATHEXT)
+# .bat — pour cmd et PowerShell (via PATHEXT)
+# Set-Location vers repo/ obligatoire : les imports src.* sont relatifs au répertoire racine du projet
 $batPath = "$BIN_DIR\cycode.bat"
 @(
     '@echo off'
     "set CYCODE_HOME=$BASE_DIR"
-    "`"$python`" -m cycode.main %*"
+    "cd /d `"$REPO_DIR`""
+    "`"$python`" -c `"from src.cycode_repl import launch_repl; launch_repl()`" %*"
 ) | Set-Content -Path $batPath -Encoding Ascii
 
-# Launcher .ps1 (natif PowerShell, évite les problèmes PATHEXT)
+# .ps1 — natif PowerShell, fallback si PATHEXT ne contient pas .BAT
 $ps1Path = "$BIN_DIR\cycode.ps1"
 @(
     "`$env:CYCODE_HOME = '$BASE_DIR'"
-    "& `"$python`" -m cycode.main @args"
+    "Set-Location '$REPO_DIR'"
+    "& `"$python`" -c `"from src.cycode_repl import launch_repl; launch_repl()`" @args"
 ) | Set-Content -Path $ps1Path -Encoding UTF8
 
 Write-Host "  Launcher .bat : $batPath" -ForegroundColor DarkGray
@@ -173,7 +179,7 @@ if ($resolved) {
     Write-Host "  'cycode' trouvé : $($resolved.Source)" -ForegroundColor DarkGray
 } else {
     Write-Host "  Avertissement : 'cycode' non résolu dans cette session." -ForegroundColor DarkYellow
-    Write-Host "  Essayez : & `"$ps1Path`"" -ForegroundColor DarkYellow
+    Write-Host "  Utilisez directement : & `"$ps1Path`"" -ForegroundColor DarkYellow
 }
 
 # ── Terminé ───────────────────────────────────────────────────────────────────
