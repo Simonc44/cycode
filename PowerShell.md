@@ -29,7 +29,7 @@ powershell -Command "irm [https://raw.githubusercontent.com/Simonc44/cycode/main
 Pour supprimer CyCode et nettoyer toutes les configurations associées de votre système :
 
 ```powershell
-powershell -Command "irm [https://raw.githubusercontent.com/Simonc44/cycode/main/uninstall-cycode.ps1](https://raw.githubusercontent.com/Simonc44/cycode/main/uninstall-cycode.ps1) | iex"
+powershell -Command "irm https://raw.githubusercontent.com/Simonc44/cycode/main/uninstall_cycode.ps1 | iex"
 
 ```
 
