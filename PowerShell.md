@@ -51,10 +51,3 @@ Une fois installé, il vous suffit de taper **`cycode`** dans n'importe quel ter
 | `/models` | Voir les modèles disponibles |
 | `/image <txt>` | Générer une image |
 | `/help` | Aide complète |
-
----
-
-*Projet maintenu par Simonc44.*
-Souhaitez-vous que je vous aide à structurer votre `README.md` principal pour qu'il pointe vers ce fichier `PowerShell.md` ?
-
-```
