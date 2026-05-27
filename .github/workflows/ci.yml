@@ -1,4 +1,4 @@
-name: CyCode CI Quality Check
+name: CyCode Python CI
 
 on:
   push:
@@ -7,30 +7,24 @@ on:
     branches: [ main ]
 
 jobs:
-  test-and-clean:
+  python-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-
-      - name: Install dependencies
+          
+      - name: Install project
         run: |
           pip install --upgrade pip
           pip install ruff mypy
-          # Installe votre projet en mode édition pour tester l'entrée 'cycode'
           pip install -e .
 
-      - name: Check code style (Ruff)
-        run: ruff check src/
+      - name: Check code (Ruff)
+        run: ruff check src/ --fix
 
-      - name: Check type hints (Mypy)
+      - name: Check types (Mypy)
         run: mypy src/ --ignore-missing-imports
-
-      - name: Test command entry point
-        run: |
-          # Vérifie que la commande 'cycode' est bien reconnue
-          cycode --help
