@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cycode"
+version = "0.1.0"
+description = "Assistant de codage IA avancé"
+dependencies = [
+    "requests",
+    "rich",
+    "prompt_toolkit",
+]
+
+[project.scripts]
+cycode = "src.cycode_repl:launch_repl"
