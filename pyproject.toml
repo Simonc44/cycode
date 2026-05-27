@@ -4,8 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cycode"
-version = "0.1.0"
+version = "2.0.100"
 description = "Assistant de codage IA avancé"
+# Ajoutez cette ligne dynamique pour corriger l'erreur
+dynamic = ["requires-python"]
+
 dependencies = [
     "requests",
     "rich",
@@ -14,3 +17,10 @@ dependencies = [
 
 [project.scripts]
 cycode = "src.cycode_repl:launch_repl"
+
+# Déclarez ceci ici explicitement pour que setuptools le prenne en compte
+[tool.setuptools]
+license-files = []
+
+[tool.setuptools.dynamic]
+requires-python = { text = ">=3.9" }
