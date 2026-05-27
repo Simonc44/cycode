@@ -5,12 +5,12 @@ $baseDir = "$HOME\.cycode"
 
 function Write-Logo {
     Write-Host @"
-   ██████╗██╗  ██╗ ██████╗ ██████╗ ██████╗ ███████╗
+    ██████╗██╗  ██╗ ██████╗ ██████╗ ██████╗ ███████╗
   ██╔════╝╚██╗ ██╔╝██╔════╝██╔═══██╗██╔══██╗██╔════╝
-  ██║      ╚████╔╝ ██║     ██║   ██║██║  ██║█████╗  
-  ██║       ╚██╔╝  ██║     ██║   ██║██║  ██║██╔══╝  
-  ╚██████╗   ██║   ╚██████╗╚██████╔╝██████╔╝███████╗
-   ╚═════╝   ╚═╝    ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
+  ██║     ╚████╔╝ ██║     ██║   ██║██║  ██║█████╗  
+  ██║      ╚██╔╝  ██║     ██║   ██║██║  ██║██╔══╝  
+  ╚██████╗  ██║   ╚██████╗╚██████╔╝██████╔╝███████╗
+   ╚═════╝  ╚═╝    ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
 "@ -ForegroundColor $Colors.Fail
     Write-Host "--- Désinstallation de CyCode ---`n" -ForegroundColor $Colors.Dim
 }
@@ -31,7 +31,7 @@ $items = @(
 
 Write-Host "`nSuppression en cours..." -ForegroundColor $Colors.Accent
 
-# Boucle de suppression avec barre de progression
+# Suppression des dossiers et fichiers
 for ($i = 0; $i -lt $items.Count; $i++) {
     $item = $items[$i]
     Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de : $($item.desc)" -PercentComplete (($i / $items.Count) * 100)
@@ -41,10 +41,21 @@ for ($i = 0; $i -lt $items.Count; $i++) {
     }
 }
 
-# Suppression de l'alias dans le profil
+# Suppression de l'exécutable système (cycode.exe)
+Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de l'exécutable système" -PercentComplete 90
+$pyPath = Get-Command python.exe -ErrorAction SilentlyContinue
+if ($pyPath) {
+    $scriptsDir = Join-Path (Split-Path $pyPath.Definition) "Scripts"
+    $exePath = Join-Path $scriptsDir "cycode.exe"
+    if (Test-Path $exePath) {
+        Remove-Item $exePath -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# Suppression de l'alias dans le profil utilisateur
 if (Test-Path $PROFILE) {
     $content = Get-Content $PROFILE
-    $newContent = $content | Where-Object { $_ -notmatch "function cycode" }
+    $newContent = $content | Where-Object { $_ -notmatch "cycode" }
     $newContent | Set-Content $PROFILE
 }
 
