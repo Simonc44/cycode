@@ -1,6 +1,10 @@
 $ErrorActionPreference = "Stop"
 $Host.UI.RawUI.WindowTitle = "CyCode Engine - Désinstallation"
 
+# !! CRITIQUE : se placer dans $HOME immédiatement
+# Windows verrouille tout dossier où un terminal est ouvert
+Set-Location $HOME
+
 $baseDir = "$HOME\.cycode"
 $binDir  = "$baseDir\bin"
 $venvDir = "$baseDir\venv"
@@ -34,9 +38,8 @@ function Remove-IfExists {
     param([string]$Path, [string]$Desc)
     if (Test-Path $Path) {
         Remove-Item $Path -Recurse -Force -ErrorAction SilentlyContinue
-        # Vérifie que la suppression a bien eu lieu
         if (Test-Path $Path) {
-            Write-Host "`n  $([char]0x26A0)  $Desc — impossible à supprimer (terminal ouvert dans ce dossier ?)." -ForegroundColor DarkYellow
+            Write-Host "`n  $([char]0x26A0)  $Desc — toujours verrouillé, suppression manuelle requise." -ForegroundColor DarkYellow
         } else {
             Write-Host "`n  $([char]0x2714)  $Desc supprimé." -ForegroundColor DarkGray
         }
@@ -55,12 +58,7 @@ if ($confirm.Trim().ToLower() -ne "o") {
     exit 0
 }
 
-Write-Host ""
-
-# !! CRITIQUE : quitter le répertoire AVANT toute suppression
-# Si le terminal est dans ~\.cycode\*, Windows verrouille le dossier
-Set-Location $HOME
-Write-Host "  Répertoire de travail déplacé vers $HOME`n" -ForegroundColor DarkGray
+Write-Host "`nDésinstallation en cours..." -ForegroundColor Cyan
 
 $steps = @(
     @{
@@ -68,8 +66,17 @@ $steps = @(
         Action = {
             $pip = "$venvDir\Scripts\pip.exe"
             if (Test-Path $pip) {
-                & $pip uninstall cycode -y 2>&1 | Out-Null
-                Write-Host "`n  $([char]0x2714)  Package pip désinstallé." -ForegroundColor DarkGray
+                # Désactive temporairement Stop pour les warnings natifs pip
+                $prev = $ErrorActionPreference
+                $ErrorActionPreference = "SilentlyContinue"
+                $result = & $pip uninstall cycode -y 2>&1
+                $ErrorActionPreference = $prev
+
+                if ($LASTEXITCODE -ne 0 -and ($result -notmatch "not installed")) {
+                    Write-Host "`n  $([char]0x26A0)  pip : $result" -ForegroundColor DarkYellow
+                } else {
+                    Write-Host "`n  $([char]0x2714)  Package pip désinstallé (ou déjà absent)." -ForegroundColor DarkGray
+                }
             } else {
                 Write-Host "`n  $([char]0x2012)  pip venv introuvable (ignoré)." -ForegroundColor DarkGray
             }
@@ -78,12 +85,11 @@ $steps = @(
     @{
         Label  = "Suppression du répertoire principal"
         Action = {
-            # Tente une suppression forcée avec robocopy (vide le dossier d'abord)
-            # pour contourner les verrous résiduels
             if (Test-Path $baseDir) {
-                $empty = New-Item -ItemType Directory -Path "$env:TEMP\cycode_empty_tmp" -Force
-                robocopy "$($empty.FullName)" $baseDir /MIR /NFL /NDL /NJH /NJS 2>&1 | Out-Null
-                Remove-Item $empty.FullName -Force -ErrorAction SilentlyContinue
+                # Vide d'abord avec robocopy pour contourner les verrous Windows
+                $tmp = New-Item -ItemType Directory -Path "$env:TEMP\cycode_empty_tmp" -Force
+                robocopy "$($tmp.FullName)" $baseDir /MIR /NFL /NDL /NJH /NJS 2>&1 | Out-Null
+                Remove-Item $tmp.FullName -Force -ErrorAction SilentlyContinue
             }
             Remove-IfExists $baseDir "Répertoire principal (~\.cycode)"
         }
@@ -91,25 +97,26 @@ $steps = @(
     @{
         Label  = "Suppression config Cygnis"
         Action = {
-            Remove-IfExists "$HOME\.cygnis.json"   "Config Cygnis (~\.cygnis.json)"
-            Remove-IfExists "$HOME\.config\cygnis" "Config Cygnis (~\.config\cygnis)"
+            Remove-IfExists "$HOME\.cygnis.json"   "Config (~\.cygnis.json)"
+            Remove-IfExists "$HOME\.config\cygnis" "Config (~\.config\cygnis)"
         }
     },
     @{
         Label  = "Suppression de l'historique REPL"
-        Action = { Remove-IfExists "$HOME\.cycode_history" "Historique REPL" }
+        Action = {
+            Remove-IfExists "$HOME\.cycode_history" "Historique REPL"
+        }
     },
     @{
         Label  = "Suppression des exécutables système"
         Action = {
-            $scriptsDirs = @(
+            @(
+                "$env:LOCALAPPDATA\Programs\Python\Python313\Scripts",
                 "$env:LOCALAPPDATA\Programs\Python\Python312\Scripts",
                 "$env:LOCALAPPDATA\Programs\Python\Python311\Scripts",
-                "$env:APPDATA\Python\Python312\Scripts",
-                "$env:LOCALAPPDATA\Programs\Python\Python313\Scripts"
-            )
-            foreach ($dir in $scriptsDirs) {
-                Remove-IfExists (Join-Path $dir "cycode.exe") "cycode.exe ($dir)"
+                "$env:APPDATA\Python\Python312\Scripts"
+            ) | ForEach-Object {
+                Remove-IfExists (Join-Path $_ "cycode.exe") "cycode.exe ($_)"
             }
         }
     },
@@ -120,8 +127,7 @@ $steps = @(
             if ($userPath -like "*\.cycode*") {
                 $cleaned = ($userPath.Split(';') | Where-Object { $_ -notlike "*\.cycode*" }) -join ';'
                 [Environment]::SetEnvironmentVariable("PATH", $cleaned, "User")
-                $machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
-                $env:PATH = "$machinePath;$cleaned"
+                $env:PATH = [Environment]::GetEnvironmentVariable("PATH", "Machine") + ";$cleaned"
                 Write-Host "`n  $([char]0x2714)  Entrées CyCode retirées du PATH." -ForegroundColor DarkGray
             } else {
                 Write-Host "`n  $([char]0x2012)  PATH déjà propre (ignoré)." -ForegroundColor DarkGray
@@ -140,13 +146,14 @@ $steps = @(
                 } else {
                     Write-Host "`n  $([char]0x2012)  Aucune référence cycode dans `$PROFILE." -ForegroundColor DarkGray
                 }
+            } else {
+                Write-Host "`n  $([char]0x2012)  `$PROFILE introuvable (ignoré)." -ForegroundColor DarkGray
             }
         }
     }
 )
 
 $total = $steps.Count
-
 for ($i = 0; $i -lt $total; $i++) {
     Show-Progress -Step $i -Total $total -Label $steps[$i].Label
     Start-Sleep -Milliseconds 100
@@ -155,7 +162,6 @@ for ($i = 0; $i -lt $total; $i++) {
 
 Show-Progress -Step $total -Total $total -Label "Terminé"
 
-# ── Résumé ────────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "$([char]0x2705) CyCode a été supprimé proprement." -ForegroundColor Green
 Write-Host "Fermez ce terminal — il pointait vers un dossier qui n'existe plus." -ForegroundColor DarkGray
