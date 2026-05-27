@@ -1,6 +1,12 @@
+param(
+    [Parameter(Position=0)]
+    [ValidatePattern('^(stable|latest|\d+\.\d+\.\d+(-[^\s]+)?)$')]
+    [string]$Target = "latest"
+)
+
+Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
-$Host.UI.RawUI.WindowTitle = "CyCode Engine - Installation"
-$Colors = @{ Accent="Cyan"; Success="Green"; Fail="Red"; Dim="DarkGray"; White="White" }
+$ProgressPreference = 'SilentlyContinue'
 
 # --- Logo ASCII ---
 function Write-Logo {
@@ -11,58 +17,62 @@ function Write-Logo {
   ██║      ╚██╔╝  ██║     ██║   ██║██║  ██║██╔══╝  
   ╚██████╗  ██║   ╚██████╗╚██████╔╝██████╔╝███████╗
    ╚═════╝  ╚═╝    ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝
-"@ -ForegroundColor $Colors.Accent
+"@ -ForegroundColor Cyan
 }
 
 Clear-Host
 Write-Logo
 
-# --- Fonction de progression ---
-function Update-Install {
-    param([int]$step, [string]$msg)
-    Write-Progress -Activity "Installation de CyCode" -Status "Étape $step/4 : $msg" -PercentComplete ($step * 25)
+# --- Configuration ---
+$APP_NAME = "CyCode"
+$BASE_DIR = "$HOME\.cycode"
+$BIN_DIR = "$BASE_DIR\bin"
+$DOWNLOAD_DIR = "$BASE_DIR\downloads"
+
+New-Item -ItemType Directory -Force -Path $BIN_DIR, $DOWNLOAD_DIR | Out-Null
+
+Write-Host "--- Installation de $APP_NAME ---" -ForegroundColor Cyan
+
+# 1. Vérification système
+if (-not [Environment]::Is64BitProcess) {
+    Write-Error "$APP_NAME ne supporte pas le 32-bit. Utilisez un Windows 64-bit."
+    exit 1
 }
 
-# 1. Vérification
-Update-Install 1 "Vérification des prérequis..."
-if (!(Get-Command python -ErrorAction SilentlyContinue)) { 
-    Write-Host "Erreur: Python n'est pas installé ou non trouvé dans le PATH." -ForegroundColor $Colors.Fail; exit 
-}
-$baseDir = "$HOME\.cycode"
-if (!(Test-Path $baseDir)) { New-Item -Path $baseDir -ItemType Directory | Out-Null }
-Set-Location $baseDir
-
-# 2. Sync
-Update-Install 2 "Synchronisation du dépôt..."
+# 2. Synchronisation
+Write-Output "Synchronisation des sources..."
 $repoUrl = "https://github.com/Simonc44/cycode.git"
-if (Test-Path ".git") { git pull | Out-Null } else { git clone $repoUrl . | Out-Null }
-
-# 3. Environnement & Dépendances
-Update-Install 3 "Configuration de l'environnement Python..."
-if (!(Test-Path "venv")) { python -m venv venv }
-# Utilisation du chemin absolu pour l'activation
-. "$baseDir\venv\Scripts\Activate.ps1"
-python -m pip install --upgrade pip --quiet
-pip install rich prompt-toolkit --quiet
-pip install -e . --quiet
-
-# 4. Finalisation
-Update-Install 4 "Finalisation et création de l'alias..."
-$cmd = "function cycode { & '$baseDir\venv\Scripts\activate'; python -m cycode.main }"
-
-# Vérification du profil
-if (!(Test-Path $PROFILE)) { New-Item -ItemType File -Path $PROFILE -Force | Out-Null }
-
-# Lecture du profil et ajout uniquement si la fonction est absente
-$profileContent = Get-Content $PROFILE -ErrorAction SilentlyContinue
-if ($profileContent -notcontains $cmd) {
-    $cmd | Out-File -FilePath $PROFILE -Append
-    Write-Host " [i] Alias 'cycode' ajouté à votre profil." -ForegroundColor $Colors.Dim
+if (Test-Path "$BASE_DIR\.git") {
+    Push-Location $BASE_DIR; git pull | Out-Null; Pop-Location
 } else {
-    Write-Host " [i] L'alias 'cycode' est déjà présent." -ForegroundColor $Colors.Dim
+    git clone $repoUrl $BASE_DIR | Out-Null
 }
 
-# --- Fin ---
-Write-Progress -Activity "Installation de CyCode" -Completed
-Write-Host " [✅] Installation terminée avec succès !" -ForegroundColor $Colors.Success
-Write-Host " [🚀] Tapez 'cycode' dans une NOUVELLE fenêtre pour lancer l'assistant." -ForegroundColor $Colors.White
+# 3. Environnement
+Write-Output "Configuration de l'environnement Python..."
+$venvPath = "$BASE_DIR\venv"
+if (!(Test-Path "$venvPath\Scripts\python.exe")) {
+    python -m venv $venvPath
+}
+
+& "$venvPath\Scripts\python.exe" -m pip install --upgrade pip --quiet
+& "$venvPath\Scripts\pip.exe" install -e . --quiet
+
+# 4. Launcher (Bat)
+$launcherPath = "$BIN_DIR\cycode.bat"
+$batContent = @"
+@echo off
+"$venvPath\Scripts\python.exe" -m cycode.main %*
+"@
+$batContent | Out-File -FilePath $launcherPath -Encoding ascii
+
+# Ajout au PATH utilisateur
+$userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+if ($userPath -notlike "*$BIN_DIR*") {
+    [Environment]::SetEnvironmentVariable("PATH", "$userPath;$BIN_DIR", "User")
+    Write-Output "Ajout de $BIN_DIR au PATH utilisateur."
+}
+
+Write-Output ""
+Write-Host "$([char]0x2705) Installation terminée avec succès !" -ForegroundColor Green
+Write-Output "Redémarrez votre terminal et tapez 'cycode' pour lancer l'assistant."
