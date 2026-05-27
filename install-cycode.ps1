@@ -34,12 +34,12 @@ Clear-Host
 Write-Logo
 
 # --- Configuration ---
-$APP_NAME  = "CyCode"
-$BASE_DIR  = "$HOME\.cycode"
-$BIN_DIR   = "$BASE_DIR\bin"
-$REPO_DIR  = "$BASE_DIR\repo"          # séparé du venv et du bin
-$VENV_DIR  = "$BASE_DIR\venv"
-$REPO_URL  = "https://github.com/Simonc44/cycode.git"
+$APP_NAME = "CyCode"
+$BASE_DIR = "$HOME\.cycode"
+$BIN_DIR  = "$BASE_DIR\bin"
+$REPO_DIR = "$BASE_DIR\repo"
+$VENV_DIR = "$BASE_DIR\venv"
+$REPO_URL = "https://github.com/Simonc44/cycode.git"
 
 Write-Host "--- Installation de $APP_NAME (cible : $Target) ---`n" -ForegroundColor Cyan
 
@@ -58,13 +58,15 @@ foreach ($tool in @("git", "python")) {
     }
 }
 
-# Vérifie que Python ≥ 3.8
+# Vérifie que Python >= 3.8
 $pyVersion = python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')" 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Impossible de déterminer la version de Python."
     exit 1
 }
-$pyMajor, $pyMinor = $pyVersion.Split('.') | ForEach-Object { [int]$_ }
+$pyParts = $pyVersion.Trim().Split('.')
+$pyMajor = [int]$pyParts[0]
+$pyMinor = [int]$pyParts[1]
 if ($pyMajor -lt 3 -or ($pyMajor -eq 3 -and $pyMinor -lt 8)) {
     Write-Error "Python 3.8+ requis (trouvé : $pyVersion)."
     exit 1
@@ -80,8 +82,9 @@ Write-Step "Synchronisation du dépôt ($Target)..."
 if (Test-Path "$REPO_DIR\.git") {
     Push-Location $REPO_DIR
     git fetch --quiet origin
-    if ($LASTEXITCODE -ne 0) { Write-Error "Échec de 'git fetch'."; exit 1 }
+    if ($LASTEXITCODE -ne 0) { Write-Error "Échec de 'git fetch'."; Pop-Location; exit 1 }
     git pull --quiet
+    if ($LASTEXITCODE -ne 0) { Write-Error "Échec de 'git pull'."; Pop-Location; exit 1 }
     Pop-Location
 } else {
     git clone --quiet $REPO_URL $REPO_DIR
@@ -118,33 +121,68 @@ if ($LASTEXITCODE -ne 0) { Write-Error "Échec de la mise à jour de pip."; exit
 & $pip install -e $REPO_DIR --quiet
 if ($LASTEXITCODE -ne 0) { Write-Error "Échec de l'installation du paquet."; exit 1 }
 
-# ── 5. Création du launcher ───────────────────────────────────────────────────
-Write-Step "Création du launcher..."
+# ── 5. Création des launchers ─────────────────────────────────────────────────
+Write-Step "Création des launchers..."
 
-$launcherPath = "$BIN_DIR\cycode.bat"
-
-# Utilise Set-Content pour éviter les problèmes d'encodage avec Out-File
-$batLines = @(
+# Launcher .bat (compatible cmd et PowerShell via PATHEXT)
+$batPath = "$BIN_DIR\cycode.bat"
+@(
     '@echo off'
     "set CYCODE_HOME=$BASE_DIR"
     "`"$python`" -m cycode.main %*"
-)
-$batLines | Set-Content -Path $launcherPath -Encoding Ascii
+) | Set-Content -Path $batPath -Encoding Ascii
 
-Write-Host "  Launcher créé : $launcherPath" -ForegroundColor DarkGray
+# Launcher .ps1 (natif PowerShell, évite les problèmes PATHEXT)
+$ps1Path = "$BIN_DIR\cycode.ps1"
+@(
+    "`$env:CYCODE_HOME = '$BASE_DIR'"
+    "& `"$python`" -m cycode.main @args"
+) | Set-Content -Path $ps1Path -Encoding UTF8
 
-# ── 6. Mise à jour du PATH utilisateur ───────────────────────────────────────
+Write-Host "  Launcher .bat : $batPath" -ForegroundColor DarkGray
+Write-Host "  Launcher .ps1 : $ps1Path" -ForegroundColor DarkGray
+
+# ── 6. Mise à jour du PATH utilisateur + session courante ────────────────────
+Write-Step "Configuration du PATH..."
+
 $userPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($userPath -notlike "*$BIN_DIR*") {
     [Environment]::SetEnvironmentVariable("PATH", "$userPath;$BIN_DIR", "User")
     Write-Host "  '$BIN_DIR' ajouté au PATH utilisateur." -ForegroundColor DarkGray
 } else {
-    Write-Host "  PATH déjà configuré." -ForegroundColor DarkGray
+    Write-Host "  PATH utilisateur déjà configuré." -ForegroundColor DarkGray
+}
+
+# Rafraîchit le PATH dans la session PowerShell courante immédiatement
+$machinePath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+$freshUserPath = [Environment]::GetEnvironmentVariable("PATH", "User")
+$env:PATH = "$machinePath;$freshUserPath"
+Write-Host "  PATH de la session courante rechargé." -ForegroundColor DarkGray
+
+# ── 7. Vérification PATHEXT ───────────────────────────────────────────────────
+$pathExt = [Environment]::GetEnvironmentVariable("PATHEXT", "Machine")
+if ($pathExt -notlike "*.BAT*") {
+    Write-Warning "PATHEXT ne contient pas .BAT — utilisez 'cycode.ps1' si 'cycode' ne fonctionne pas."
+}
+
+# ── 8. Vérification finale ────────────────────────────────────────────────────
+Write-Step "Vérification de l'installation..."
+
+$resolved = Get-Command cycode -ErrorAction SilentlyContinue
+if ($resolved) {
+    Write-Host "  'cycode' trouvé : $($resolved.Source)" -ForegroundColor DarkGray
+} else {
+    Write-Host "  Avertissement : 'cycode' non résolu dans cette session." -ForegroundColor DarkYellow
+    Write-Host "  Essayez : & `"$ps1Path`"" -ForegroundColor DarkYellow
 }
 
 # ── Terminé ───────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "$([char]0x2705) Installation de $APP_NAME ($Target) terminée avec succès !" -ForegroundColor Green
-Write-Host "Redémarrez votre terminal puis tapez " -NoNewline
+Write-Host ""
+Write-Host "Vous pouvez maintenant utiliser " -NoNewline
 Write-Host "cycode" -ForegroundColor Cyan -NoNewline
-Write-Host " pour lancer l'assistant."
+Write-Host " dans ce terminal ou tout nouveau terminal."
+Write-Host "Si la commande n'est pas reconnue, exécutez : " -NoNewline
+Write-Host ". `$PROFILE" -ForegroundColor Cyan -NoNewline
+Write-Host " ou redémarrez votre terminal."
