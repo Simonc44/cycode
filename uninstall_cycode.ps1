@@ -18,14 +18,12 @@ function Write-Logo {
 Clear-Host
 Write-Logo
 
-# Confirmation
 $confirm = Read-Host "Êtes-vous certain de vouloir supprimer CyCode et toutes ses données ? (o/n)"
 if ($confirm -ne "o") { Write-Host "Désinstallation annulée." -ForegroundColor $Colors.Accent; exit }
 
 Write-Host "`nSuppression en cours..." -ForegroundColor $Colors.Accent
 
 # 1. Désinstallation via PIP
-Write-Progress -Activity "Nettoyage CyCode" -Status "Désinstallation du package Python (pip)" -PercentComplete 20
 pip uninstall cycode -y | Out-Null
 
 # 2. Suppression des dossiers et fichiers
@@ -38,22 +36,16 @@ $items = @(
 
 for ($i = 0; $i -lt $items.Count; $i++) {
     $item = $items[$i]
-    Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de : $($item.desc)" -PercentComplete (40 + ($i / $items.Count) * 30)
-    
     if (Test-Path $item.path) {
         Remove-Item $item.path -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
-# 3. Suppression de l'exécutable système (cycode.exe)
-Write-Progress -Activity "Nettoyage CyCode" -Status "Suppression de l'exécutable système" -PercentComplete 80
-$pyPath = Get-Command python.exe -ErrorAction SilentlyContinue
-if ($pyPath) {
-    $scriptsDir = Join-Path (Split-Path $pyPath.Definition) "Scripts"
-    $exePath = Join-Path $scriptsDir "cycode.exe"
-    if (Test-Path $exePath) {
-        Remove-Item $exePath -Force -ErrorAction SilentlyContinue
-    }
+# 3. Suppression de l'exécutable dans AppData (Correction directe)
+$appDataScripts = "C:\Users\admin\AppData\Local\Programs\Python\Python312\Scripts"
+$exePathAppData = Join-Path $appDataScripts "cycode.exe"
+if (Test-Path $exePathAppData) {
+    Remove-Item $exePathAppData -Force -ErrorAction SilentlyContinue
 }
 
 # 4. Suppression de l'alias dans le profil utilisateur
@@ -63,6 +55,5 @@ if (Test-Path $PROFILE) {
     $newContent | Set-Content $PROFILE
 }
 
-Write-Progress -Activity "Nettoyage CyCode" -Completed
 Write-Host "[✅] CyCode a été supprimé proprement." -ForegroundColor $Colors.Success
 Write-Host "Le terminal a été nettoyé." -ForegroundColor $Colors.Dim
