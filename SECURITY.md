@@ -6,7 +6,7 @@ La sécurité est une priorité pour CyCode. Si vous découvrez une faille de s�
 
 Pour signaler une vulnérabilité de manière sécurisée, veuillez contacter directement le mainteneur du projet :
 
-**Email de contact :** [VOTRE_EMAIL_ICI@exemple.com]
+**Email de contact :** [cygnis.ai@gmail.com]
 
 ### Informations à fournir :
 Afin de nous aider à reproduire et corriger le problème rapidement, merci d'inclure :
