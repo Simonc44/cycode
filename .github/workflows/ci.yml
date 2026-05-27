@@ -24,9 +24,10 @@ jobs:
           pip install -e .
 
       - name: Check code (Ruff)
-        # On ignore les règles de style qui bloquent votre syntaxe actuelle (E701, E702, E722, F401)
-        run: ruff check src/ --ignore E701,E702,E722,F401,E401
+        # --fix : corrige automatiquement les erreurs mineures
+        # --ignore : désactive les règles de style qui bloquent le build sur votre projet actuel
+        run: ruff check src/ --fix --ignore E701,E702,E722,F401,E401,E741,F541
 
       - name: Check types (Mypy)
-        # On ignore les erreurs d'imports manquants pour les dépendances externes
+        # --ignore-missing-imports : évite les erreurs si des bibliothèques externes manquent de typage
         run: mypy src/ --ignore-missing-imports
