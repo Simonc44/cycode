@@ -9,7 +9,7 @@ Bienvenue dans le guide de déploiement de CyCode. Ce document contient les comm
 Copiez et collez la commande suivante dans votre terminal PowerShell :
 
 ```powershell
-powershell -Command "irm [https://raw.githubusercontent.com/Simonc44/cycode/main/install-cycode.ps1](https://raw.githubusercontent.com/Simonc44/cycode/main/install-cycode.ps1) | iex"
+powershell -Command "irm https://raw.githubusercontent.com/Simonc44/cycode/main/install-cycode.ps1 | iex"
 
 ```
 
