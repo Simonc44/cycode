@@ -1,0 +1,39 @@
+[package]
+name = "rusty-cygnis-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cygnis"
+path = "src/main.rs"
+
+[dependencies]
+api = { path = "../api" }
+commands = { path = "../commands" }
+compat-harness = { path = "../compat-harness" }
+crossterm = "0.28"
+pulldown-cmark = "0.13"
+rustyline = "15"
+runtime = { path = "../runtime" }
+plugins = { path = "../plugins" }
+serde = { version = "1", features = ["derive"] }
+serde_json.workspace = true
+syntect = "5"
+tokio = { version = "1", features = ["rt-multi-thread", "signal", "time"] }
+tools = { path = "../tools" }
+indicatif = "0.17"
+walkdir = "2.5"
+colored = "2.1"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+mock-cygnis-service = { path = "../mock-cygnis-service" }
+serde_json.workspace = true
+tokio = { version = "1", features = ["rt-multi-thread"] }
+
+[build-dependencies]
+embed-resource = "2.4"

@@ -1,0 +1,9 @@
+target/
+.omx/
+.clawd-agents/
+# Claw Code local artifacts
+.claude/settings.local.json
+.claude/sessions/
+
+# Cygnis Secrets
+.env

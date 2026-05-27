@@ -1,0 +1,19 @@
+[package]
+name = "mock-cygnis-service"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "mock-cygnis-service"
+path = "src/main.rs"
+
+[dependencies]
+api = { path = "../api" }
+serde_json.workspace = true
+tokio = { version = "1", features = ["full", "signal"] }
+anyhow = "1.0"
+
+[lints]
+workspace = true

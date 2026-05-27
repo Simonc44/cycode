@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""
+cycode — CyCode CLI entry point
+Usage: cycode [OPTIONS] [PROMPT]
+
+Examples:
+  cycode                        # interactive REPL
+  cycode "refactor this file"   # one-shot prompt
+  cycode --model alpha2         # force model
+  cycode --api-key <KEY>        # override API key
+"""
+import sys
+import os
+
+# Make sure src is importable
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from src.cycode_cli import main
+
+if __name__ == "__main__":
+    sys.exit(main())
